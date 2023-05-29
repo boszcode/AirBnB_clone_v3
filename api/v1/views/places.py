@@ -1,186 +1,517 @@
 #!/usr/bin/python3
-'''places blueprint'''
-
-from api.v1.views import app_views
-from flask import jsonify, abort, request, make_response
-from models import storage, storage_t
-from models.place import Place
-from models.state import State
-from models.city import City
-from models.user import User
+"""
+This is module places
+"""
+from api.v1.views import (app_views, Place, storage)
+from flask import (abort, jsonify, make_response, request)
+import os
 
 
-@app_views.route('/cities/<city_id>/places',
-                 methods=['GET'],
+@app_views.route('/cities/<city_id>/places', methods=['GET'],
                  strict_slashes=False)
-def getPlacesInCity(city_id=None):
-    '''get all places in a city'''
-    if city_id is None:
+def view_places_in_city(city_id):
+    """Example endpoint returns a list of all places in a city
+    Retrieves all places within a city
+    ---
+    parameters:
+      - name: city_id
+        in: path
+        type: string
+        enum: ['None', '1da255c0-f023-4779-8134-2b1b40f87683']
+        required: true
+        default: None
+    definitions:
+      Place:
+        type: object
+        properties:
+          __class__:
+            type: string
+            description: The string of class object
+          created_at:
+            type: string
+            description: The date the object created
+          description:
+            type: string
+            description: The description of the place
+          id:
+            type: string
+            description: The id of the place
+          latitude:
+            type: float
+          longitude:
+            type: float
+          max_guest:
+            type: int
+            description: The maximum guest allowed
+          name:
+            type: string
+            description: name of the place
+          number_bathrooms:
+            type: int
+          number_rooms:
+            type: int
+          price_by_night:
+            type: int
+          updated_at:
+            type: string
+            description: The date the object was updated
+          user_id:
+            type: string
+            description: id of the owner of the place
+            items:
+              $ref: '#/definitions/Color'
+      Color:
+        type: string
+    responses:
+      200:
+        description: A list of dictionaries of place object
+        schema:
+          $ref: '#/definitions/Place'
+        examples:
+            [{
+             "__class__": "Place",
+             "city_id": "1da255c0-f023-4779-8134-2b1b40f87683",
+             "created_at": "2017-03-25T02:17:06",
+             "description": "The guest house is located uptown",
+             "id": "279b355e-ff9a-4b85-8114-6db7ad2a4cd2",
+             "latitude": 29.9493,
+             "longitude": -90.1171,
+             "max_guest": 2,
+             "name": "Guest House by Tulane",
+             "number_bathrooms": 1,
+             "number_rooms": 0,
+             "price_by_night": 60,
+             "updated_at": "2017-03-25T02:17:06",
+             "user_id": "8394fd35-8a8a-479f-a398-48f53b4a6554"
+             }]
+    """
+    city = storage.get("City", city_id)
+    if city is None:
         abort(404)
-    ct = storage.get(City, city_id)
-    if ct is None:
+    result = [place.to_json() for place in city.places]
+    return jsonify(result)
+
+
+@app_views.route('/places/<place_id>', methods=['GET'], strict_slashes=False)
+def view_place(place_id=None):
+    """Example endpoint returns a single place
+    Retrieves one place with the given id
+    ---
+    parameters:
+      - name: place_id
+        in: path
+        type: string
+        enum: ['None', 279b355e-ff9a-4b85-8114-6db7ad2a4cd2"]
+        required: true
+        default: None
+    definitions:
+      Place:
+        type: object
+        properties:
+          __class__:
+            type: string
+            description: The string of class object
+          created_at:
+            type: string
+            description: The date the object created
+          description:
+            type: string
+            description: The description of the place
+          id:
+            type: string
+            description: The id of the place
+          latitude:
+            type: float
+          longitude:
+            type: float
+          max_guest:
+            type: int
+            description: The maximum guest allowed
+          name:
+            type: string
+            description: name of the place
+          number_bathrooms:
+            type: int
+          number_rooms:
+            type: int
+          price_by_night:
+            type: int
+          updated_at:
+            type: string
+            description: The date the object was updated
+          user_id:
+            type: string
+            description: id of the owner of the place
+            items:
+              $ref: '#/definitions/Color'
+      Color:
+        type: string
+    responses:
+      200:
+        description: A list of a dictionary of a place obj
+        schema:
+          $ref: '#/definitions/Place'
+        examples:
+            [{
+             "__class__": "Place",
+             "city_id": "1da255c0-f023-4779-8134-2b1b40f87683",
+             "created_at": "2017-03-25T02:17:06",
+             "description": "The guest house is located uptown",
+             "id": "279b355e-ff9a-4b85-8114-6db7ad2a4cd2",
+             "latitude": 29.9493,
+             "longitude": -90.1171,
+             "max_guest": 2,
+             "name": "Guest House by Tulane",
+             "number_bathrooms": 1,
+             "number_rooms": 0,
+             "price_by_night": 60,
+             "updated_at": "2017-03-25T02:17:06",
+             "user_id": "8394fd35-8a8a-479f-a398-48f53b4a6554"
+             }]
+    """
+    s = storage.get("Place", place_id)
+    if s is None:
         abort(404)
-
-    places = storage.all(Place)
-    res = []
-    for place in places.values():
-        if place.city_id == ct.id:
-            res.append(place)
-
-    return jsonify([place.to_dict() for place in res])
+    return jsonify(s.to_json())
 
 
-@app_views.route('/places/<place_id>',
-                 methods=['GET'],
+@app_views.route('/places/<place_id>', methods=['DELETE'],
                  strict_slashes=False)
-def getPlaceById(place_id=None):
-    '''gets place by id'''
-    if place_id is None:
-        abort(404)
-    place = storage.get(Place, place_id)
+def delete_place(place_id=None):
+    """Example endpoint deleting one place
+    Deletes a place based on the place_id of the JSON body
+    ---
+    definitions:
+      Place:
+        type: object
+      Color:
+        type: string
+      items:
+        $ref: '#/definitions/Color'
+
+    responses:
+      200:
+        description: An empty dictionary
+        schema:
+          $ref: '#/definitions/City'
+        examples:
+            {}
+    """
+    place = storage.get("Place", place_id)
     if place is None:
         abort(404)
-    return jsonify(place.to_dict())
+    storage.delete(place)
+    return jsonify({}), 200
 
 
-@app_views.route('/places/<place_id>',
-                 methods=['DELETE'],
+@app_views.route('/cities/<city_id>/places', methods=['POST'],
                  strict_slashes=False)
-def deletePlace(place_id=None):
-    '''deletes a place'''
-    if place_id is not None:
-        res = storage.get(Place, place_id)
-        if res is not None:
-            storage.delete(res)
-            storage.save()
-            return make_response(jsonify({}), 200)
-    abort(404)
-
-
-@app_views.route('/cities/<city_id>/places',
-                 methods=['POST'],
-                 strict_slashes=False)
-def postPlace(city_id):
-    '''posts a new place'''
-    if city_id is None:
+def create_place(city_id):
+    """Example endpoint creates a single place
+    Create a single place based on the JSON body
+    ---
+    parameters:
+      - name: city_id
+        in: path
+        type: string
+        enum: ['None', "1da255c0-f023-4779-8134-2b1b40f87683"]
+        required: true
+        default: None
+    definitions:
+      Place:
+        type: object
+        properties:
+          __class__:
+            type: string
+            description: The string of class object
+          created_at:
+            type: string
+            description: The date the object created
+          description:
+            type: string
+            description: The description of the place
+          id:
+            type: string
+            description: The id of the place
+          latitude:
+            type: float
+          longitude:
+            type: float
+          max_guest:
+            type: int
+            description: The maximum guest allowed
+          name:
+            type: string
+            description: name of the place
+          number_bathrooms:
+            type: int
+          number_rooms:
+            type: int
+          price_by_night:
+            type: int
+          updated_at:
+            type: string
+            description: The date the object was updated
+          user_id:
+            type: string
+            description: id of the owner of the place
+            items:
+              $ref: '#/definitions/Color'
+      Color:
+        type: string
+    responses:
+      201:
+        description: A list of a dictionary of a place obj
+        schema:
+          $ref: '#/definitions/Place'
+        examples:
+            [{"__class__": "Place",
+              "created_at": "2017-03-25T02:17:06",
+              "id": "dacec983-cec4-4f68-bd7f-af9068a305f5",
+              "name": "The Lynn House",
+              "city_id": "1721b75c-e0b2-46ae-8dd2-f86b62fb46e6",
+              "user_id": "3ea61b06-e22a-459b-bb96-d900fb8f843a",
+              "description": "Our place is 2 blocks from Vista Park",
+              "number_rooms": 2,
+              "number_bathrooms": 2,
+              "max_guest": 4,
+              "price_by_night": 82,
+              "latitude": 31.4141,
+              "longitude": -109.879,
+              "updated_at": "2017-03-25T02:17:06"
+               }]
+     """
+    city = storage.get("City", city_id)
+    if city is None:
         abort(404)
-    ct = storage.get(City, city_id)
-    if ct is None:
-        abort(404)
-
-    body = request.get_json()
-    if body is None:
-        abort(400, 'Not a JSON')
-    if 'user_id' not in body.keys():
-        abort(400, 'Missing user_id')
-
-    user = storage.get(User, body['user_id'])
+    try:
+        r = request.get_json()
+    except:
+        r = None
+    if r is None:
+        return "Not a JSON", 400
+    if 'user_id' not in r.keys():
+        return "Missing user_id", 400
+    user = storage.get("User", r.get("user_id"))
     if user is None:
         abort(404)
-    if 'name' not in body.keys():
-        abort(400, 'Missing name')
+    if 'name' not in r.keys():
+        return "Missing name", 400
+    r["city_id"] = city_id
+    s = Place(**r)
+    s.save()
+    return jsonify(s.to_json()), 201
 
-    body['city_id'] = ct.id
-    place = Place(**body)
-    place.save()
-    return make_response(jsonify(place.to_dict()), 201)
+
+@app_views.route('/places/<place_id>', methods=['PUT'], strict_slashes=False)
+def update_place(place_id=None):
+    """Example endpoint creates a single place
+    Updates a place based on the JSON body
+    ---
+    parameters:
+      - name: place_id
+        in: path
+        type: string
+        enum: ['None', "279b355e-ff9a-4b85-8114-6db7ad2a4cd2"]
+        required: true
+        default: None
+    definitions:
+      Place:
+        type: object
+        properties:
+          __class__:
+            type: string
+            description: The string of class object
+          created_at:
+            type: string
+            description: The date the object created
+          description:
+            type: string
+            description: The description of the place
+          id:
+            type: string
+            description: The id of the place
+          latitude:
+            type: float
+          longitude:
+            type: float
+          max_guest:
+            type: int
+            description: The maximum guest allowed
+          name:
+            type: string
+            description: name of the place
+          number_bathrooms:
+            type: int
+          number_rooms:
+            type: int
+          price_by_night:
+            type: int
+          updated_at:
+            type: string
+            description: The date the object was updated
+          user_id:
+            type: string
+            description: id of the owner of the place
+            items:
+              $ref: '#/definitions/Color'
+      Color:
+        type: string
+    responses:
+      200:
+        description: A list of a dictionary of a place obj
+        schema:
+          $ref: '#/definitions/Place'
+        examples:
+            [{
+             "__class__": "Place",
+             "city_id": "1da255c0-f023-4779-8134-2b1b40f87683",
+             "created_at": "2017-03-25T02:17:06",
+             "description": "The guest house is located uptown",
+             "id": "279b355e-ff9a-4b85-8114-6db7ad2a4cd2",
+             "latitude": 29.9493,
+             "longitude": -90.1171,
+             "max_guest": 2,
+             "name": "Guest House by Tulane",
+             "number_bathrooms": 1,
+             "number_rooms": 0,
+             "price_by_night": 60,
+             "updated_at": "2017-03-25T02:17:06",
+             "user_id": "8394fd35-8a8a-479f-a398-48f53b4a6554"
+             }]
+    """
+    try:
+        r = request.get_json()
+    except:
+        r = None
+    if r is None:
+        return "Not a JSON", 400
+    a = storage.get("Place", place_id)
+    if a is None:
+        abort(404)
+    for k in ("id", "user_id", "city_id", "created_at", "updated_at"):
+        r.pop(k, None)
+    for k, v in r.items():
+        setattr(a, k, v)
+    a.save()
+    return jsonify(a.to_json()), 200
 
 
 @app_views.route('/places_search', methods=['POST'], strict_slashes=False)
-def placesSearch():
-    '''retrives all place objects depending on the request body'''
-    body = request.get_json()
-    if body is None:
-        abort(400, 'Not a JSON')
-    keys = body.keys()
-    if len(body) <= 0\
-       or (('states' not in keys or len(body['states']) <= 0) and
-       ('cities' not in keys or len(body['cities']) <= 0)):
-        if 'amenities' not in keys:
-            places = storage.all(Place).values()
-            dcts = [pl.to_dict() for pl in places]
-            if storage_t == 'db':
-                for idx in range(len(dcts)):
-                    if 'amenities' in dcts[idx].keys():
-                        del dcts[idx]['amenities']
-            return jsonify(dcts)
-        else:
-            places = storage.all(Place).values()
-            unwanted = []
-            for idx, place in enumerate(places):
-                if storage_t == 'db':
-                    amens_ids = [m.id for m in place.amenities]
-                else:
-                    amens_ids = place.amenity_ids
-                for amenity_id in body['amenities']:
-                    if amenity_id not in amens_ids:
-                        unwanted.append(idx)
-                        break
-            for idx, i in enumerate(unwanted):
-                del places[i - idx]
-            dcts = [pl.to_dict() for pl in places]
-            if storage_t == 'db':
-                for idx in range(len(dcts)):
-                    if 'amenities' in dcts[idx].keys():
-                        del dcts[idx]['amenities']
-            return jsonify(dcts)
+def list_places():
+    """Example endpoint list all places of a JSON body
+    Retrieves a list of all places of a JSON body
+    ---
+    parameters:
+      - name: city_id
+        in: path
+        type: string
+        enum: ['None', "1da255c0-f023-4779-8134-2b1b40f87683"]
+        required: true
+        default: None
+    definitions:
+      Place:
+        type: object
+        properties:
+          __class__:
+            type: string
+            description: The string of class object
+          created_at:
+            type: string
+            description: The date the object created
+          description:
+            type: string
+            description: The description of the place
+          id:
+            type: string
+            description: The id of the place
+          latitude:
+            type: float
+          longitude:
+            type: float
+          max_guest:
+            type: int
+            description: The maximum guest allowed
+          name:
+            type: string
+            description: name of the place
+          number_bathrooms:
+            type: int
+          number_rooms:
+            type: int
+          price_by_night:
+            type: int
+          updated_at:
+            type: string
+            description: The date the object was updated
+          user_id:
+            type: string
+            description: id of the owner of the place
+            items:
+              $ref: '#/definitions/Color'
+      Color:
+        type: string
+    responses:
+      200:
+        description: A list of a dictionary of the desire objects
+        schema:
+          $ref: '#/definitions/Place'
+        examples:
+            [{"__class__": "Place",
+              "created_at": "2017-03-25T02:17:06",
+              "id": "dacec983-cec4-4f68-bd7f-af9068a305f5",
+              "name": "The Lynn House",
+              "city_id": "1721b75c-e0b2-46ae-8dd2-f86b62fb46e6",
+              "user_id": "3ea61b06-e22a-459b-bb96-d900fb8f843a",
+              "description": "Our place is 2 blocks from Vista Park",
+              "number_rooms": 2,
+              "number_bathrooms": 2,
+              "max_guest": 4,
+              "price_by_night": 82,
+              "latitude": 31.4141,
+              "longitude": -109.879,
+              "updated_at": "2017-03-25T02:17:06"
+               },
+             "..."]
+     """
+    try:
+        r = request.get_json()
+    except:
+        r = None
+    if r is None:
+        return "Not a JSON", 400
+    if not r:
+        return jsonify([e.to_json() for e in storage.all("Place").values()])
 
-    places = storage.all(Place).values()
-    wanted_places = []
-    cities = {}
+    all_cities_id = r.get("cities", [])
+    states = r.get("states")
+    if states:
+        all_states = [storage.get("State", s) for s in states]
+        all_states = [a for a in all_states if a is not None]
+        all_cities_id += [c.id for s in all_states for c in s.cities]
+    all_cities_id = list(set(all_cities_id))
 
-    if 'cities' in keys:
-        for cityId in body['cities']:
-            cities[cityId] = cityId
-
-    if 'states' in keys:
-        for state in storage.all(State).values():
-            if state.id in body['states']:
-                for city in state.cities:
-                    cities[city.id] = city.id
-
-    for place in places:
-        if len(cities) > 0:
-            if place.city_id in cities:
-                wanted_places.append(place)
-    unwanted = []
-    if 'amenities' in keys:
-        for idx, place in enumerate(wanted_places):
-            if storage_t == 'db':
-                amens_ids = [m.id for m in place.amenities]
+    all_amenities = r.get("amenities")
+    all_places = []
+    if all_cities_id or all_amenities:
+        all_places2 = storage.all("Place").values()
+        if all_cities_id:
+            all_places2 = [p for p in all_places2 if
+                           p.city_id in all_cities_id]
+        if all_amenities:
+            if os.getenv('HBNB_TYPE_STORAGE', 'fs') != 'db':
+                all_places = [p for p in all_places2 if
+                              set(all_amenities) <= set(p.amenities_id)]
             else:
-                amens_ids = place.amenity_ids
-            for amenity_id in body['amenities']:
-                if amenity_id not in amens_ids:
-                    unwanted.append(idx)
-                    break
-
-    for idx, i in enumerate(unwanted):
-        del wanted_places[i - idx]
-    dcts = [pl.to_dict() for pl in wanted_places]
-    if storage_t == 'db':
-        for idx in range(len(dcts)):
-            if 'amenities' in dcts[idx].keys():
-                del dcts[idx]['amenities']
-    return jsonify(dcts)
-
-
-@app_views.route('/places/<place_id>',
-                 methods=['PUT'],
-                 strict_slashes=False)
-def updatePlace(place_id=None):
-    '''updates a user'''
-    if place_id is None:
-        abort(404)
-    obj = storage.get(Place, place_id)
-    if obj is None:
-        abort(404)
-
-    body = request.get_json()
-    if body is None:
-        abort(400, 'Not a JSON')
-    for key in body.keys():
-        if key not in ['id', 'created_at', 'updated_at', 'city_id', 'user_id']:
-            setattr(obj, key, body[key])
-    obj.save()
-    return make_response(jsonify(obj.to_dict()), 200)
+                for e in all_places2:
+                    flag = True
+                    for a in all_amenities:
+                        if a not in [i.id for i in e.amenities]:
+                            flag = False
+                            break
+                    if flag:
+                          
+                        all_places.append(e)
+        else:
+            all_places = all_places2
+    return jsonify([p.to_json() for p in all_places])
